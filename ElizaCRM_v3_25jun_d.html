@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ElizaCRM · Cash4Key</title>
+<style>
+  :root {
+    --navy: #1B2A4A; --green: #1A5C2A; --gold: #C8902A;
+    --hot: #c0392b; --hot-bg: #fde8e8;
+    --warm: #e67e22; --warm-bg: #fef3e2;
+    --cold: #2980b9; --cold-bg: #e8f4fd;
+    --closed: #1A5C2A; --closed-bg: #e8f8f0;
+    --border: #e4e4e4; --bg: #f0f2f5; --white: #fff;
+    --text: #1B2A4A; --muted: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+  header { background: linear-gradient(135deg, var(--navy), var(--green)); color: white; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 1.3rem; letter-spacing: .5px; }
+  header .sub { font-size: .78rem; opacity: .8; margin-top: 2px; }
+  .sync-status { font-size: .72rem; padding: 4px 10px; border-radius: 20px; font-weight: 700; }
+  .sync-ok   { background: #d4edda; color: #155724; }
+  .sync-err  { background: #f8d7da; color: #721c24; }
+  .sync-busy { background: #fff3cd; color: #856404; }
+  .toolbar { background: white; padding: 10px 28px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .toolbar input, .toolbar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: .82rem; background: white; }
+  .toolbar input { min-width: 200px; }
+  .btn { padding: 7px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: .82rem; font-weight: 700; transition: opacity .15s; white-space: nowrap; }
+  .btn:hover { opacity: .85; }
+  .btn-gold  { background: var(--gold);  color: white; }
+  .btn-green { background: var(--green); color: white; }
+  .btn-navy  { background: var(--navy);  color: white; }
+  .btn-red   { background: var(--hot);   color: white; }
+  .btn-gray  { background: #eee; color: #333; }
+  .btn-drive { background: #fbbc04; color: #1a1a1a; font-weight: 800; }
+  .stats { display: flex; gap: 12px; padding: 14px 28px; flex-wrap: wrap; }
+  .stat { background: white; border-radius: 10px; padding: 12px 18px; min-width: 110px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.07); flex: 1 1 auto; }
+  .stat .num { font-size: 1.7rem; font-weight: 800; }
+  .stat .lbl { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+  .stat.total .num { color: var(--navy); }
+  .stat.hot   .num { color: var(--hot); }
+  .stat.warm  .num { color: var(--warm); }
+  .stat.cold  .num { color: var(--cold); }
+  .stat.closed{ border-left: 3px solid var(--green); } .stat.closed .num { color: var(--green); }
+  .stat.venc  { border-left: 3px solid var(--hot); }   .stat.venc .num  { color: var(--hot); }
+  .table-wrap { padding: 0 28px 30px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.07); font-size: .75rem; }
+  th { background: var(--navy); color: white; padding: 8px 6px; text-align: left; font-size: .7rem; white-space: nowrap; }
+  td { padding: 4px 6px; border-bottom: 1px solid #f2f2f2; vertical-align: middle; }
+  tr:hover td { background: #fafafa; }
+  tr.vencido td { background: #fff8f8 !important; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .72rem; font-weight: 700; white-space: nowrap; }
+  .b-hot    { background: var(--hot-bg);    color: var(--hot); }
+  .b-warm   { background: var(--warm-bg);   color: var(--warm); }
+  .b-cold   { background: var(--cold-bg);   color: var(--cold); }
+  .b-closed { background: var(--closed-bg); color: var(--closed); }
+  .sel { padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px; font-size: .68rem; background: white; cursor: pointer; max-width: 110px; }
+  .int-wrap { display: flex; align-items: center; gap: 3px; justify-content: center; }
+  .int-btn { background: none; border: 1px solid #ccc; border-radius: 3px; padding: 0 5px; cursor: pointer; font-size: .68rem; line-height: 1.5; }
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 1000; justify-content: center; align-items: center; }
+  .overlay.active { display: flex; }
+  .modal { background: white; border-radius: 14px; padding: 26px; width: 94%; max-width: 600px; max-height: 92vh; overflow-y: auto; }
+  .modal h2 { margin-bottom: 16px; color: var(--navy); font-size: 1.05rem; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+  .fg { display: flex; flex-direction: column; gap: 3px; }
+  .fg.full { grid-column: 1/-1; }
+  .fg label { font-size: .75rem; font-weight: 700; color: #555; }
+  .fg input, .fg select, .fg textarea { padding: 7px 9px; border: 1px solid #ccc; border-radius: 6px; font-size: .84rem; font-family: inherit; }
+  .fg textarea { min-height: 65px; resize: vertical; }
+  .modal-btns { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; flex-wrap: wrap; }
+  .norma-form { background: #f8fff9; border: 1px solid #b2dfdb; border-radius: 10px; padding: 16px; margin-top: 10px; }
+  .norma-form h3 { font-size: .85rem; color: var(--green); margin-bottom: 12px; font-weight: 700; }
+  .norma-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .norma-field { display: flex; flex-direction: column; gap: 3px; }
+  .norma-field label { font-size: .72rem; font-weight: 700; color: #555; }
+  .norma-field select, .norma-field input, .norma-field textarea { padding: 6px 8px; border: 1px solid #ccc; border-radius: 5px; font-size: .8rem; font-family: inherit; background: white; }
+  .norma-field.full { grid-column: 1/-1; }
+  .nota-item { background: #fffbf0; border-left: 3px solid var(--gold); padding: 8px 12px; border-radius: 0 6px 6px 0; margin-bottom: 6px; }
+  .nota-fecha { font-size: .66rem; color: #aaa; font-weight: 700; margin-bottom: 2px; }
+  .nota-texto { font-size: .8rem; color: #444; white-space: pre-wrap; }
+  .nota-tag { display: inline-block; font-size: .62rem; font-weight: 700; padding: 1px 6px; border-radius: 10px; margin-right: 4px; }
+  .nt-hot  { background: var(--hot-bg);  color: var(--hot); }
+  .nt-warm { background: var(--warm-bg); color: var(--warm); }
+  .nt-cold { background: var(--cold-bg); color: var(--cold); }
+  .pitch-panel { background: #f0f6ff; border: 1px solid #b3d0f5; border-radius: 10px; padding: 14px; margin-top: 10px; }
+  .pitch-panel h3 { font-size: .85rem; color: var(--navy); margin-bottom: 8px; font-weight: 700; }
+  .pitch-msg { font-size: .85rem; color: #333; line-height: 1.5; white-space: pre-wrap; background: white; border: 1px solid #ddd; border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; }
+  .pitch-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .est-box { font-size: .78rem; background: #fffbf0; border-left: 3px solid var(--gold); padding: 8px 12px; border-radius: 0 6px 6px 0; color: #555; }
+  .drive-toast { position: fixed; bottom: 24px; right: 24px; background: #1A5C2A; color: white; padding: 10px 18px; border-radius: 8px; font-size: .82rem; font-weight: 700; z-index: 9999; display: none; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  @media (max-width: 768px) {
+    header { padding: 14px 16px; }
+    .toolbar { padding: 10px 14px; }
+    .toolbar input { width: 100%; }
+    .stats { padding: 10px 14px; }
+    .table-wrap { padding: 0 10px 20px; overflow-x: auto; }
+    .form-grid, .norma-grid { grid-template-columns: 1fr; }
+    .modal { padding: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🏠 ElizaCRM</h1>
+    <div class="sub">Proyecto Eliza · Facebook Marketplace</div>
+  </div>
+  <div style="text-align:right">
+    <div style="font-size:.85rem;font-weight:700;" id="fecha-hoy"></div>
+    <div id="sync-badge" class="sync-status sync-busy" style="margin-top:5px;display:inline-block;">⏳ Iniciando...</div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <input type="text" id="buscar" placeholder="🔍 Buscar nombre, teléfono..." oninput="render()">
+  <select id="f-temp" onchange="render()">
+    <option value="">Todas las temperaturas</option>
+    <option>🔴 Hot</option><option>🟡 Warm</option><option>🔵 Cold</option>
+  </select>
+  <select id="f-etapa" onchange="render()">
+    <option value="">Todas las etapas</option>
+    <option>Nuevo Lead</option><option>Info Enviada</option><option>Llamada Intentada</option>
+    <option>Call Back</option><option>Calificando</option><option>Calificado</option>
+    <option>Cita Agendada</option><option>Rescheduled</option><option>Showing</option>
+    <option>Negociando</option><option>Cerrado ✅</option><option>No Calificado ❌</option><option>Sin Respuesta 👻</option>
+  </select>
+  <select id="f-asignado" onchange="render()">
+    <option value="">Todos</option><option>Ruben</option><option>Norma</option>
+  </select>
+  <button class="btn btn-gold" onclick="abrirModal()">+ Nuevo Lead</button>
+  <button class="btn btn-green" onclick="exportCSV()">⌗ CSV</button>
+  <button class="btn btn-navy" onclick="syncManual()">🔄 Sheet</button>
+  <button class="btn btn-drive" onclick="guardarEnDrive()">☁️ Guardar en Drive</button>
+  <button class="btn btn-gray" onclick="resetearDatos()">🔄 Resetear</button>
+</div>
+
+<div class="stats">
+  <div class="stat total"><div class="num" id="s-total">0</div><div class="lbl">Total Leads</div></div>
+  <div class="stat hot">  <div class="num" id="s-hot">0</div>  <div class="lbl">🔴 Hot</div></div>
+  <div class="stat warm"> <div class="num" id="s-warm">0</div> <div class="lbl">🟡 Warm</div></div>
+  <div class="stat cold"> <div class="num" id="s-cold">0</div> <div class="lbl">🔵 Cold</div></div>
+  <div class="stat closed"><div class="num" id="s-closed">0</div><div class="lbl">✅ Cerrados</div></div>
+  <div class="stat venc"> <div class="num" id="s-venc">0</div>  <div class="lbl">⚠️ Vencidos</div></div>
+</div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr>
+    <th>#</th><th>Fecha</th><th>Nombre</th><th>WhatsApp</th>
+    <th>Tipo</th><th>Fuente</th><th>Etapa</th><th>Temp</th>
+    <th>Próx. Seg.</th><th>Canal</th><th>Asignado</th><th>Intentos</th><th>Acción</th>
+  </tr></thead>
+  <tbody id="tbody"></tbody>
+</table>
+</div>
+
+<!-- MODAL NUEVO LEAD -->
+<div class="overlay" id="modal-nuevo">
+  <div class="modal">
+    <h2>✦ Nuevo Lead</h2>
+    <div class="form-grid">
+      <div class="fg"><label>Nombre *</label><input type="text" id="f-nombre"></div>
+      <div class="fg"><label>WhatsApp *</label><input type="tel" id="f-whatsapp"></div>
+      <div class="fg"><label>Email</label><input type="email" id="f-email"></div>
+      <div class="fg"><label>Fuente</label><select id="f-fuente"><option>FBMP</option><option>Instagram</option><option>Referido</option><option>TikTok</option><option>Otro</option></select></div>
+      <div class="fg"><label>Tipo de Comprador</label><select id="f-tipo"><option>Sin definir</option><option>FHA</option><option>Cash</option><option>Convencional</option><option>ITIN</option><option>VA</option></select></div>
+      <div class="fg"><label>Zona de Interés</label><input type="text" id="f-zona" placeholder="Corona, IE, Riverside..."></div>
+      <div class="fg"><label>Etapa</label><select id="f-etapa2">
+        <option>Nuevo Lead</option><option>Info Enviada</option><option>Llamada Intentada</option>
+        <option>Call Back</option><option>Calificando</option><option>Calificado</option>
+        <option>Cita Agendada</option><option>Rescheduled</option><option>Showing</option>
+        <option>Negociando</option><option>Cerrado ✅</option><option>No Calificado ❌</option><option>Sin Respuesta 👻</option>
+      </select></div>
+      <div class="fg"><label>Próx. Seguimiento</label><input type="date" id="f-seg"></div>
+      <div class="fg"><label>Canal</label><select id="f-canal"><option>WhatsApp</option><option>Llamada</option><option>Email</option><option>ManyChat</option></select></div>
+      <div class="fg"><label>Asignado a</label><select id="f-asignado2"><option>Ruben</option><option>Norma</option></select></div>
+      <div class="fg"><label>Idioma</label><select id="f-idioma"><option>Español</option><option>Inglés</option><option>Ambos</option></select></div>
+      <div class="fg full"><label>Nota inicial</label><textarea id="f-notas"></textarea></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-gray" onclick="cerrarModal('modal-nuevo')">Cancelar</button>
+      <button class="btn btn-gold" onclick="guardarNuevoLead()">Guardar Lead</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE -->
+<div class="overlay" id="modal-detalle">
+  <div class="modal" id="modal-detalle-body"></div>
+</div>
+
+<!-- TOAST -->
+<div class="drive-toast" id="drive-toast">☁️ Drive actualizado</div>
+
+<script>
+const SHEETS_URL  = 'https://script.google.com/macros/s/AKfycbxb7REufUfgOEIRvtUGUXSj_7R0llTWKomz82ctzb9WKHBD3Nz5Q-gFgKvN6HtAEA5FNA/exec';
+const TIMEOUT_MS  = 10000;
+const STORAGE_KEY = 'crm_eliza_leads_v3';
+
+const DEFAULTS = [
+  {id:1,fecha:"6/14/2026",nombre:"Armando Gonzales",whatsapp:"(661) 655-0818",email:"",tipo:"Sin definir",zona:"",fuente:"FBMP",etapa:"Info Enviada",seguimiento:"2026-06-24",canal:"WhatsApp",asignado:"Ruben",intentos:2,idioma:"Español",notas:"Crédito: No sabe\nUrgencia: Quiere comprar en 60-90 días\nPresupuesto: 500\nPróximo paso: Necesita mas informacion de nosotros\nNotas: Se le envio whatsapp con informacion de primer comprador, no respondió",historialNotas:[{fecha:"24/06/26, 9:18 a.m.",texto:"Crédito: No sabe\nUrgencia: Quiere comprar en 60-90 días\nPresupuesto: 500\nPróximo paso: Necesita mas informacion de nosotros\nNotas: Se le envio whatsapp con informacion de primer comprador, no respondió",tipo:"Cold"},{fecha:"6/14/2026",texto:"Llegó por el anuncio, se le envió WhatsApp",tipo:"Cold"}]},
+  {id:2,fecha:"6/14/2026",nombre:"Patty Hemet",whatsapp:"(714) 574-7578",email:"",tipo:"Sin definir",zona:"",fuente:"FBMP",etapa:"Info Enviada",seguimiento:"2026-06-24",canal:"WhatsApp",asignado:"Ruben",intentos:2,idioma:"Español",notas:"Se le volvió a mandar whats",historialNotas:[{fecha:"6/14/2026",texto:"Se le volvió a mandar whats",tipo:"Cold"}]},
+  {id:3,fecha:"6/14/2026",nombre:"Israel Hemet",whatsapp:"(949) 662-7417",email:"",tipo:"Sin definir",zona:"Corona",fuente:"FBMP",etapa:"Llamada Intentada",seguimiento:"2026-06-24",canal:"WhatsApp",asignado:"Ruben",intentos:2,idioma:"Español",notas:"Cliente quiere casa por Corona",historialNotas:[{fecha:"6/14/2026",texto:"Cliente quiere casa por Corona",tipo:"Cold"}]},
+  {id:4,fecha:"6/15/2026",nombre:"Edgar Partida",whatsapp:"(760) 443-0280",email:"",tipo:"FHA",zona:"",fuente:"FBMP",etapa:"Cita Agendada",seguimiento:"2026-06-24",canal:"WhatsApp",asignado:"Norma",intentos:2,idioma:"Español",notas:"Precalificado 3pm",historialNotas:[{fecha:"6/15/2026",texto:"Precalificado 3pm",tipo:"Hot"}]},
+  {id:5,fecha:"6/15/2026",nombre:"Karla Colon / Liliana Bringas",whatsapp:"9519037075",email:"",tipo:"Cash",zona:"",fuente:"FBMP",etapa:"Showing",seguimiento:"2026-06-23",canal:"WhatsApp",asignado:"Norma",intentos:2,idioma:"Español",notas:"Norma mandó email esperando prueba de fondos. Señor Gregorio Malagon.",historialNotas:[{fecha:"6/15/2026",texto:"Supuestamente trae cash 4pm. Liliana Bringas. Señor Gregorio Malagón — mandar email prueba de fondos.",tipo:"Hot"}]},
+  {id:6,fecha:"6/14/2026",nombre:"Maria Perez",whatsapp:"(951) 783-7360",email:"",tipo:"Sin definir",zona:"",fuente:"FBMP",etapa:"Call Back",seguimiento:"2026-06-24",canal:"Llamada",asignado:"Norma",intentos:1,idioma:"Español",notas:"No contestó. Esposo: Jose",historialNotas:[{fecha:"6/14/2026",texto:"No contestó. Esposo: Jose",tipo:"Warm"}]},
+  {id:7,fecha:"6/17/2026",nombre:"Araceli Madero",whatsapp:"562 4880878",email:"",tipo:"FHA",zona:"",fuente:"FBMP",etapa:"Sin Respuesta 👻",seguimiento:"2026-06-24",canal:"WhatsApp",asignado:"Ruben",intentos:2,idioma:"Español",notas:"Dijo que ya no estaba lista, cosas personales",historialNotas:[{fecha:"6/17/2026",texto:"Dijo que ya no estaba lista, cosas personales",tipo:"Cold"}]},
+  {id:8,fecha:"6/19/2026",nombre:"Paul Licto",whatsapp:"9098103684",email:"",tipo:"FHA",zona:"",fuente:"FBMP",etapa:"Cita Agendada",seguimiento:"2026-06-24",canal:"WhatsApp",asignado:"Ruben",intentos:2,idioma:"Español",notas:"Mandar lista de documentos y email de Eliza.",historialNotas:[{fecha:"6/19/2026",texto:"Mandar lista de documentos y email de Eliza. Seguir por WhatsApp.",tipo:"Hot"}]},
+  {id:9,fecha:"6/20/2026",nombre:"Chris Vazquez",whatsapp:"951-545-8926",email:"",tipo:"FHA",zona:"",fuente:"FBMP",etapa:"Cita Agendada",seguimiento:"2026-06-21",canal:"Llamada",asignado:"Norma",intentos:1,idioma:"Español",notas:"Vazquez",historialNotas:[{fecha:"6/20/2026",texto:"Vazquez",tipo:"Hot"}]},
+  {id:10,fecha:"6/21/2026",nombre:"Marion Vasquez",whatsapp:"7145880656",email:"",tipo:"Cash",zona:"",fuente:"FBMP",etapa:"Cita Agendada",seguimiento:"2026-06-21",canal:"Llamada",asignado:"Norma",intentos:1,idioma:"Español",notas:"Busca casa $300k–$350k cash",historialNotas:[{fecha:"6/21/2026",texto:"Busca casa de oportunidad $300k–$350k cash",tipo:"Hot"}]},
+  {id:11,fecha:"6/22/2026",nombre:"Veronica Garrido",whatsapp:"714-499-4380",email:"",tipo:"FHA",zona:"",fuente:"FBMP",etapa:"Sin Respuesta 👻",seguimiento:"2026-06-22",canal:"WhatsApp",asignado:"Norma",intentos:2,idioma:"Español",notas:"Primera compradora",historialNotas:[{fecha:"6/22/2026",texto:"Primera compradora",tipo:"Cold"}]},
+  {id:12,fecha:"6/22/2026",nombre:"Mireya GA",whatsapp:"(323)5174710",email:"",tipo:"Cash",zona:"",fuente:"FBMP",etapa:"Cita Agendada",seguimiento:"2026-06-22",canal:"WhatsApp",asignado:"Ruben",intentos:0,idioma:"Español",notas:"Se dedica a comprar casas cash",historialNotas:[{fecha:"6/22/2026",texto:"Se dedica a comprar casas cash",tipo:"Hot"}]},
+  {id:13,fecha:"6/23/2026",nombre:"Adam Acosta",whatsapp:"7143492267",email:"",tipo:"Convencional",zona:"",fuente:"FBMP",etapa:"Cita Agendada",seguimiento:"2026-06-24",canal:"Llamada",asignado:"Norma",intentos:0,idioma:"Español",notas:"",historialNotas:[]}
+];
+
+const TEMP_MAP = {
+  "Nuevo Lead":"🔵 Cold","Info Enviada":"🔵 Cold","Llamada Intentada":"🔵 Cold",
+  "Sin Respuesta 👻":"🔵 Cold","No Calificado ❌":"🔵 Cold",
+  "Call Back":"🟡 Warm","Calificando":"🟡 Warm","Calificado":"🟡 Warm","Rescheduled":"🟡 Warm",
+  "Cita Agendada":"🔴 Hot","Showing":"🔴 Hot","Negociando":"🔴 Hot","Cerrado ✅":"✅ Cerrado"
+};
+const ESTRATEGIAS = {
+  "🔴 Hot":"📞 Seguimiento en 24hrs · WhatsApp directo · Confirmar documentos · Prioridad máxima",
+  "🟡 Warm":"💌 Nurturing c/3 días · Enviar contenido útil · Resolver objeciones · Conectar con lender",
+  "🔵 Cold":"📄 Broadcast mensual · Mensaje de valor · Sin tiempo activo · Revisión en 30-60 días"
+};
+
+function buildPitch(l) {
+  const fn   = l.nombre.split(' ')[0];
+  const zona = l.zona ? ` en ${l.zona}` : '';
+  const esCash = l.tipo === 'Cash';
+  const esFHA  = ['FHA','Convencional','ITIN','VA'].includes(l.tipo);
+  const msgs = {
+    "Nuevo Lead":        () => `Hola ${fn} 👋 Vi que te interesó la propiedad${zona}. ¿Tienes unos minutos para platicar? Quedo al pendiente 🏠`,
+    "Info Enviada":      () => `Hola ${fn}, ¿pudiste revisar la información que te envié?${esCash?' Si ya tienes los fondos podemos agendar.':esFHA?' Cualquier duda sobre financiamiento con gusto te explico.':''} 😊`,
+    "Llamada Intentada": () => `Hola ${fn}, te intenté marcar. ¿Tienes un momento hoy para platicar${zona?` sobre propiedades${zona}`:''}? 📞`,
+    "Call Back":         () => `Hola ${fn}! Quedamos en hablar de nuevo, aquí ando disponible 📲`,
+    "Calificando":       () => `Hola ${fn}, para avanzar necesito confirmar algunos datos.${esCash?' ¿Puedes mandarme prueba de fondos?':esFHA?' ¿Ya tienes pre-aprobación o te conecto con nuestro lender?':''} 🤝`,
+    "Calificado":        () => `Hola ${fn}! 🎉 Ya tienes todo listo. ¿Agendamos tu cita para ver propiedades${zona}?`,
+    "Cita Agendada":     () => `Hola ${fn}, confirmando cita para el ${l.seguimiento}. ${esCash?'Recuerda traer prueba de fondos 💵':esFHA?'Recuerda tu carta de pre-aprobación 📄':''} ¡Nos vemos! 🏠`,
+    "Rescheduled":       () => `Hola ${fn}, confirmando nueva cita para el ${l.seguimiento}. ¿Sigue en pie? 😊`,
+    "Showing":           () => `Hola ${fn}! ¿Qué te pareció? Cuéntame si tienes dudas o quieres ver más opciones 🏠`,
+    "Negociando":        () => `Hola ${fn}, sigo al pendiente de tu respuesta. ¿Cómo vamos? 🤝`,
+    "Sin Respuesta 👻":  () => `Hola ${fn}, sigo aquí por si tienes alguna duda. Sin compromiso 😊`,
+    "No Calificado ❌":  () => `Hola ${fn}, gracias por tu interés. Cuando tu situación cambie aquí estamos 🙌`,
+    "Cerrado ✅":         () => `Hola ${fn}! Gracias por confiar en nosotros 🎉 Fue un placer trabajar contigo.`
+  };
+  return (msgs[l.etapa] || msgs["Nuevo Lead"])();
+}
+
+function cargarLeads() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      // Validar que los datos no están corruptos
+      if (!Array.isArray(data) || data.length === 0 || !data[0].nombre || !data[0].etapa) {
+        localStorage.removeItem(STORAGE_KEY);
+        return JSON.parse(JSON.stringify(DEFAULTS));
+      }
+      data.forEach(l => { if (!Array.isArray(l.historialNotas)) l.historialNotas = l.notas ? [{fecha:l.fecha,texto:l.notas,tipo:''}] : []; });
+      return data;
+    }
+  } catch(e) { localStorage.removeItem(STORAGE_KEY); }
+  return JSON.parse(JSON.stringify(DEFAULTS));
+}
+function guardarLeads() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(leads)); } catch(e) {}
+}
+// Limpiar datos corruptos del v1
+(function() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      const corrupto = data.some(l => !l.etapa || !l.nombre);
+      if (corrupto) { localStorage.removeItem(STORAGE_KEY); }
+    }
+  } catch(e) { localStorage.removeItem(STORAGE_KEY); }
+})();
+
+let leads  = cargarLeads();
+let nextId = leads.length ? Math.max(...leads.map(l=>l.id)) + 1 : 1;
+
+// Al arrancar, siempre jalamos del Sheet como fuente de verdad
+window.addEventListener('DOMContentLoaded', () => { iniciarDesdeSheet(); });
+
+async function iniciarDesdeSheet() {
+  setBadge('busy','⏳ Cargando leads del Sheet...');
+  try {
+    const res = await fetchT(SHEETS_URL, {method:'GET'});
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const lista = Array.isArray(data) ? data : null;
+    if (lista && lista.length > 0) {
+      leads = lista;
+      leads.forEach(l => { if (!Array.isArray(l.historialNotas)) l.historialNotas = l.notas?[{fecha:l.fecha,texto:l.notas,tipo:''}]:[]; });
+      nextId = Math.max(...leads.map(l=>l.id)) + 1;
+      guardarLeads();
+      render();
+      setBadge('ok','✅ Conectado · Sheet');
+    } else {
+      // Sheet vacío — usar DEFAULTS y poblar Sheet
+      leads = JSON.parse(JSON.stringify(DEFAULTS));
+      nextId = leads.length + 1;
+      guardarLeads();
+      render();
+      for (const l of leads) {
+        await fetchT(SHEETS_URL, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'upsert',lead:l})});
+      }
+      setBadge('ok','✅ Sheet inicializado');
+    }
+  } catch(e) {
+    setBadge('err','⚠️ Sin conexión · datos locales');
+    render();
+  }
+}
+
+function setBadge(state, msg) {
+  const b = document.getElementById('sync-badge');
+  b.className = 'sync-status ' + (state==='ok'?'sync-ok':state==='err'?'sync-err':'sync-busy');
+  b.textContent = msg;
+}
+function fetchT(url, opts) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  return fetch(url, Object.assign({signal:ctrl.signal}, opts||{})).finally(() => clearTimeout(t));
+}
+async function pushLead(l) {
+  try { await fetchT(SHEETS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'upsert',lead:l})}); } catch(e) {}
+}
+async function pushDelete(id) {
+  try { await fetchT(SHEETS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'delete',id})}); } catch(e) {}
+}
+
+// ============================================================
+// GUARDAR EN DRIVE
+// ============================================================
+function generarHTMLConDatos() {
+  const html = document.documentElement.outerHTML;
+  const leadsJSON = JSON.stringify(leads, null, 2);
+  return html.replace(/const DEFAULTS = \[[\s\S]*?\];/, `const DEFAULTS = ${leadsJSON};`);
+}
+
+async function guardarEnDrive(silencioso = false) {
+  if (!silencioso) setBadge('busy', '⏳ Sincronizando leads...');
+  try {
+    for (const l of leads) {
+      await fetchT(SHEETS_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify({action:'upsert', lead: l})
+      });
+    }
+    setBadge('ok', '✅ Sheet sincronizado');
+    mostrarToast('✅ Leads guardados en Sheet');
+  } catch(e) {
+    if (!silencioso) setBadge('err', '⚠️ Error al sincronizar');
+    console.error('Sync falló', e);
+  }
+}
+
+function resetearDatos() {
+  if (confirm('¿Resetear todos los datos al estado original del archivo?')) {
+    localStorage.clear();
+    location.reload();
+  }
+}
+function mostrarToast(msg) {
+  const t = document.getElementById('drive-toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
+async function syncManual() {
+  setBadge('busy','⏳ Sincronizando...');
+  try {
+    const res  = await fetchT(SHEETS_URL,{method:'GET'});
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const lista = Array.isArray(data) ? data : (data&&Array.isArray(data.leads)?data.leads:null);
+    if (!lista) throw new Error('Sin leads[]');
+    if (lista.length) {
+      leads = lista;
+      leads.forEach(l => { if (!Array.isArray(l.historialNotas)) l.historialNotas = l.notas?[{fecha:l.fecha,texto:l.notas,tipo:''}]:[]; });
+      guardarLeads();
+      nextId = Math.max(...leads.map(l=>l.id)) + 1;
+      render();
+      setBadge('ok','✅ Sincronizado con Sheets');
+    } else {
+      setBadge('ok','✅ Datos locales OK');
+    }
+  } catch(e) {
+    setBadge('err','⚠️ Sin conexión · datos locales');
+  }
+}
+
+// ============================================================
+// GUARDAR NOTA — sync automático Sheet + Drive
+// ============================================================
+async function guardarNotaNorma(id) {
+  const l = leads.find(x=>x.id===id);
+  if(!l) return;
+  const tipo        = document.getElementById('nn-tipo').value;
+  const tempSel     = document.getElementById('nn-temp').value;
+  const credito     = document.getElementById('nn-credito').value.trim();
+  const urgencia    = document.getElementById('nn-urgencia').value.trim();
+  const presupuesto = document.getElementById('nn-presupuesto').value.trim();
+  const next        = document.getElementById('nn-next').value.trim();
+  const extra       = document.getElementById('nn-extra').value.trim();
+  const partes = [];
+  if(tipo)        partes.push(`Tipo: ${tipo}`);
+  if(credito)     partes.push(`Crédito: ${credito}`);
+  if(urgencia)    partes.push(`Urgencia: ${urgencia}`);
+  if(presupuesto) partes.push(`Presupuesto: ${presupuesto}`);
+  if(next)        partes.push(`Próximo paso: ${next}`);
+  if(extra)       partes.push(`Notas: ${extra}`);
+  if(!partes.length) { alert('Llena al menos un campo'); return; }
+  const textoNota = partes.join('\n');
+  const ahora = new Date().toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'});
+  let tipoTemp = '';
+  if(tempSel.includes('Hot'))  tipoTemp='Hot';
+  else if(tempSel.includes('Warm')) tipoTemp='Warm';
+  else if(tempSel.includes('Cold')) tipoTemp='Cold';
+  l.historialNotas.unshift({fecha:ahora, texto:textoNota, tipo:tipoTemp});
+  l.notas = textoNota;
+  if(tipo==='Cash buyer') l.tipo='Cash';
+  else if(tipo==='FHA / Convencional') l.tipo='FHA';
+  guardarLeads();
+  setBadge('busy','⏳ Guardando...');
+  await Promise.all([pushLead(l), guardarEnDrive(true)]);
+  setBadge('ok','✅ Nota guardada · Sheet + Drive');
+  mostrarToast('✅ Nota guardada · Drive actualizado');
+  render();
+  abrirDetalle(id);
+}
+
+function getTemp(e) { return TEMP_MAP[e||''] || '🔵 Cold'; }
+function tempBadge(t) {
+  if (t.includes('Hot'))     return `<span class="badge b-hot">${t}</span>`;
+  if (t.includes('Warm'))    return `<span class="badge b-warm">${t}</span>`;
+  if (t.includes('Cerrado')) return `<span class="badge b-closed">${t}</span>`;
+  return `<span class="badge b-cold">${t}</span>`;
+}
+function esVencido(l) {
+  if (!l.etapa || l.etapa.includes('Cerrado')||l.etapa.includes('No Calificado')) return false;
+  return l.seguimiento < new Date().toISOString().split('T')[0];
+}
+function waLink(l) {
+  return `https://wa.me/${l.whatsapp.replace(/\D/g,'')}?text=${encodeURIComponent(buildPitch(l))}`;
+}
+
+const ETAPAS  = ['Nuevo Lead','Info Enviada','Llamada Intentada','Call Back','Calificando','Calificado','Cita Agendada','Rescheduled','Showing','Negociando','Cerrado ✅','No Calificado ❌','Sin Respuesta 👻'];
+const TIPOS   = ['Sin definir','FHA','Cash','Convencional','ITIN','VA'];
+const CANALES = ['WhatsApp','Llamada','Email','ManyChat'];
+const ASIGNS  = ['Ruben','Norma'];
+function sel(opts,val,fn){return `<select class="sel" onchange="${fn}">${opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>`;}
+
+function render() {
+  const b=document.getElementById('buscar').value.toLowerCase();
+  const ft=document.getElementById('f-temp').value;
+  const fe=document.getElementById('f-etapa').value;
+  const fa=document.getElementById('f-asignado').value;
+  const f=leads.filter(l=>{
+    const t=getTemp(l.etapa);
+    return (!b||l.nombre.toLowerCase().includes(b)||l.whatsapp.includes(b))&&(!ft||t===ft)&&(!fe||l.etapa===fe)&&(!fa||l.asignado===fa);
+  });
+  document.getElementById('s-total').textContent  = leads.length;
+  document.getElementById('s-hot').textContent    = leads.filter(l=>getTemp(l.etapa).includes('Hot')).length;
+  document.getElementById('s-warm').textContent   = leads.filter(l=>getTemp(l.etapa).includes('Warm')).length;
+  document.getElementById('s-cold').textContent   = leads.filter(l=>getTemp(l.etapa).includes('Cold')).length;
+  document.getElementById('s-closed').textContent = leads.filter(l=>l.etapa.includes('Cerrado')).length;
+  document.getElementById('s-venc').textContent   = leads.filter(l=>esVencido(l)).length;
+  document.getElementById('tbody').innerHTML=f.map((l,i)=>{
+    const t=getTemp(l.etapa); const v=esVencido(l);
+    return `<tr${v?' class="vencido"':''}>
+      <td>${i+1}</td>
+      <td style="color:var(--muted);white-space:nowrap;font-size:.72rem">${l.fecha}</td>
+      <td style="min-width:130px"><a href="#" onclick="abrirDetalle(${l.id});return false" style="color:var(--navy);font-weight:700;text-decoration:underline">${l.nombre}</a><br><small style="color:var(--muted)">${l.idioma}</small></td>
+      <td><a href="${waLink(l)}" target="_blank" style="color:var(--green);text-decoration:none;white-space:nowrap">📱 ${l.whatsapp}</a></td>
+      <td>${sel(TIPOS,l.tipo,`setF(${l.id},'tipo',this.value)`)}</td>
+      <td style="color:var(--muted)">${l.fuente}</td>
+      <td>${sel(ETAPAS,l.etapa,`setEtapa(${l.id},this.value)`)}</td>
+      <td>${tempBadge(t)}</td>
+      <td><input type="date" value="${l.seguimiento}" onchange="setF(${l.id},'seguimiento',this.value)" style="border:1px solid #ddd;border-radius:4px;padding:1px 4px;font-size:.68rem;width:102px"></td>
+      <td>${sel(CANALES,l.canal,`setF(${l.id},'canal',this.value)`)}</td>
+      <td>${sel(ASIGNS,l.asignado,`setF(${l.id},'asignado',this.value)`)}</td>
+      <td><div class="int-wrap"><button class="int-btn" onclick="setF(${l.id},'intentos',Math.max(0,${l.intentos}-1));render()">−</button>${l.intentos}<button class="int-btn" onclick="setF(${l.id},'intentos',${l.intentos}+1);render()">+</button></div></td>
+      <td style="white-space:nowrap"><button onclick="abrirDetalle(${l.id})" style="background:var(--navy);color:white;border:none;border-radius:4px;padding:3px 7px;font-size:.65rem;cursor:pointer">📋 Ver</button>${v?'<span style="background:var(--hot-bg);color:var(--hot);padding:1px 5px;border-radius:4px;font-size:.6rem;font-weight:700;margin-left:3px">⚠️</span>':''}</td>
+    </tr>`;
+  }).join('');
+}
+
+function setF(id,campo,val){const l=leads.find(x=>x.id===id);if(l){l[campo]=val;guardarLeads();pushLead(l);}}
+function setEtapa(id,val){const l=leads.find(x=>x.id===id);if(l){l.etapa=val;guardarLeads();pushLead(l);render();}}
+
+function abrirDetalle(id) {
+  const l=leads.find(x=>x.id===id); if(!l) return;
+  const t=getTemp(l.etapa); const v=esVencido(l);
+  const histHTML=(l.historialNotas&&l.historialNotas.length)
+    ?[...l.historialNotas].map(n=>{const tc=n.tipo==='Hot'?'nt-hot':n.tipo==='Warm'?'nt-warm':'nt-cold';return`<div class="nota-item"><div class="nota-fecha">${n.fecha}${n.tipo?` · <span class="nota-tag ${tc}">${n.tipo}</span>`:''}</div><div class="nota-texto">${(n.texto||'').replace(/</g,'&lt;')}</div></div>`;}).join('')
+    :'<div style="color:var(--muted);font-size:.82rem">Sin notas aún.</div>';
+  document.getElementById('modal-detalle-body').innerHTML=`
+    <h2>👤 ${l.nombre} ${tempBadge(t)}</h2>
+    ${v?`<div style="background:var(--hot-bg);color:var(--hot);padding:8px 12px;border-radius:6px;font-size:.8rem;font-weight:700;margin-bottom:12px">⚠️ Seguimiento vencido</div>`:''}
+    <div class="form-grid">
+      <div class="fg"><label>Nombre</label><input type="text" value="${l.nombre.replace(/"/g,'&quot;')}" onchange="setF(${l.id},'nombre',this.value);render()"></div>
+      <div class="fg"><label>WhatsApp</label><input type="text" value="${l.whatsapp}" onchange="setF(${l.id},'whatsapp',this.value);render()"></div>
+      <div class="fg"><label>Email</label><input type="email" value="${l.email||''}" onchange="setF(${l.id},'email',this.value)"></div>
+      <div class="fg"><label>Idioma</label><select onchange="setF(${l.id},'idioma',this.value)">${['Español','Inglés','Ambos'].map(o=>`<option${l.idioma===o?' selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="fg"><label>Fecha contacto</label><div style="font-size:.85rem;padding:7px 0">${l.fecha}</div></div>
+      <div class="fg"><label>Tipo Comprador</label><select onchange="setF(${l.id},'tipo',this.value);render()">${TIPOS.map(o=>`<option${l.tipo===o?' selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="fg"><label>Zona</label><input type="text" value="${l.zona||''}" onchange="setF(${l.id},'zona',this.value)"></div>
+      <div class="fg"><label>Etapa</label><select onchange="setEtapa(${l.id},this.value)">${ETAPAS.map(o=>`<option${l.etapa===o?' selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="fg"><label>Próx. Seguimiento</label><input type="date" value="${l.seguimiento}" onchange="setF(${l.id},'seguimiento',this.value);render()"></div>
+      <div class="fg"><label>Canal</label><select onchange="setF(${l.id},'canal',this.value)">${CANALES.map(o=>`<option${l.canal===o?' selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="fg"><label>Asignado a</label><select onchange="setF(${l.id},'asignado',this.value);render()">${ASIGNS.map(o=>`<option${l.asignado===o?' selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="fg"><label>Intentos</label><div style="font-size:.9rem;padding:7px 0">${l.intentos}</div></div>
+    </div>
+    <div class="pitch-panel" style="margin-top:16px">
+      <h3>📋 Mensaje Personalizado</h3>
+      <div class="pitch-msg">${buildPitch(l)}</div>
+      <div class="pitch-actions">
+        <a href="${waLink(l)}" target="_blank" class="btn btn-green" style="text-decoration:none;font-size:.78rem;padding:6px 12px">📱 Abrir en WhatsApp</a>
+        <button class="btn btn-navy" style="font-size:.78rem" onclick="copiarPitch(${l.id})">📋 Copiar</button>
+      </div>
+    </div>
+    <div class="norma-form" style="margin-top:16px">
+      <h3>📝 Agregar Nota</h3>
+      <div class="norma-grid">
+        <div class="norma-field"><label>Tipo de cliente</label><select id="nn-tipo"><option value="">-- seleccionar --</option><option>Cash buyer</option><option>Primer comprador</option><option>FHA / Convencional</option><option>Refi</option><option>No definido</option></select></div>
+        <div class="norma-field"><label>Temperatura</label><select id="nn-temp"><option value="">-- seleccionar --</option><option>🔴 Hot — listo ya</option><option>🟡 Warm — trabajar 1-4 meses</option><option>🔵 Cold — no califica aún</option></select></div>
+        <div class="norma-field"><label>Estado de crédito</label><input type="text" id="nn-credito" placeholder='"680" / "No sabe" / "Pre-aprobado"'></div>
+        <div class="norma-field"><label>Urgencia</label><input type="text" id="nn-urgencia" placeholder='"Quiere comprar en 30 días"'></div>
+        <div class="norma-field"><label>Presupuesto / zona</label><input type="text" id="nn-presupuesto" placeholder='"$350k–$420k, Riverside"'></div>
+        <div class="norma-field"><label>Próximo paso</label><input type="text" id="nn-next" placeholder='"Espera pre-aprobación"'></div>
+        <div class="norma-field full"><label>Notas adicionales</label><textarea id="nn-extra" rows="2" placeholder="Cualquier detalle extra..."></textarea></div>
+      </div>
+      <button class="btn btn-gold" style="margin-top:10px;width:100%" onclick="guardarNotaNorma(${l.id})">💾 Guardar nota · sync automático ☁️</button>
+    </div>
+    <div style="margin-top:16px">
+      <div style="font-size:.8rem;font-weight:700;color:#555;margin-bottom:8px">🗒️ Historial de Notas</div>
+      <div style="max-height:220px;overflow-y:auto">${histHTML}</div>
+    </div>
+    <div class="est-box" style="margin-top:16px">${ESTRATEGIAS[t]||''}</div>
+    <div class="modal-btns">
+      <button class="btn btn-gray" onclick="cerrarDetalle()">Cerrar</button>
+      <button class="btn btn-red" onclick="borrarLead(${l.id})">🗑️ Eliminar</button>
+    </div>`;
+  document.getElementById('modal-detalle').classList.add('active');
+}
+
+function cerrarDetalle(){document.getElementById('modal-detalle').classList.remove('active');}
+function copiarPitch(id){const l=leads.find(x=>x.id===id);if(!l)return;navigator.clipboard.writeText(buildPitch(l)).then(()=>alert('✅ Copiado')).catch(()=>prompt('Copia:',buildPitch(l)));}
+function abrirModal(){document.getElementById('modal-nuevo').classList.add('active');document.getElementById('f-seg').value=new Date().toISOString().split('T')[0];}
+function cerrarModal(id){document.getElementById(id).classList.remove('active');}
+
+function guardarNuevoLead() {
+  const n=document.getElementById('f-nombre').value.trim();
+  const w=document.getElementById('f-whatsapp').value.trim();
+  if(!n||!w){alert('Nombre y WhatsApp son requeridos');return;}
+  const nota=document.getElementById('f-notas').value.trim();
+  const ahora=new Date().toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'});
+  const nuevo={id:nextId++,fecha:new Date().toLocaleDateString('es-MX'),nombre:n,whatsapp:w,email:document.getElementById('f-email').value,tipo:document.getElementById('f-tipo').value,zona:document.getElementById('f-zona').value,fuente:document.getElementById('f-fuente').value,etapa:document.getElementById('f-etapa2').value,seguimiento:document.getElementById('f-seg').value,canal:document.getElementById('f-canal').value,asignado:document.getElementById('f-asignado2').value,idioma:document.getElementById('f-idioma').value,intentos:0,notas:nota,historialNotas:nota?[{fecha:ahora,texto:nota,tipo:''}]:[]};
+  leads.push(nuevo);
+  guardarLeads();
+  pushLead(nuevo);
+  guardarEnDrive(true);
+  cerrarModal('modal-nuevo');
+  render();
+}
+
+function borrarLead(id) {
+  const l=leads.find(x=>x.id===id);if(!l)return;
+  if(!confirm(`¿Eliminar a "${l.nombre}"?`))return;
+  leads=leads.filter(x=>x.id!==id);
+  guardarLeads();pushDelete(id);guardarEnDrive(true);cerrarDetalle();render();
+}
+
+function exportCSV(){
+  const h=['Fecha','Nombre','WhatsApp','Email','Tipo','Zona','Fuente','Etapa','Temperatura','Seguimiento','Canal','Asignado','Intentos','Idioma','Notas'];
+  const rows=leads.map(l=>[l.fecha,l.nombre,l.whatsapp,l.email||'',l.tipo,l.zona||'',l.fuente,l.etapa,getTemp(l.etapa),l.seguimiento,l.canal,l.asignado,l.intentos,l.idioma,l.notas||''].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent([h.join(','),...rows].join('\n'));
+  a.download='ElizaCRM_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+
+document.getElementById('fecha-hoy').textContent=new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+render();
+syncManual();
+</script>
+</body>
+</html>
